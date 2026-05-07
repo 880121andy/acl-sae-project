@@ -75,10 +75,10 @@ def derive_peak_and_cosine_maps(results_dir: Path) -> (Dict[str, int], Dict[str,
 def main():
     project_root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data-dir', type=Path, default=project_root / 'dataset')
-    parser.add_argument('--results-dir', type=Path, default=project_root / 'results' / 'qwen',
+    parser.add_argument('--data-dir', type=Path, default=Path('/home/tyleryeh47/sae_slang/data'))
+    parser.add_argument('--results-dir', type=Path, default=Path('/home/tyleryeh47/sae_slang/results/qwen'),
                         help='Directory with run_qwen.py outputs.')
-    parser.add_argument('--output-dir', type=Path, default=project_root / 'results' / 'qwen' / 'span_length')
+    parser.add_argument('--output-dir', type=Path, default=Path('/home/tyleryeh47/sae_slang/results/qwen/span_length'))
     parser.add_argument('--lf-csv', type=Path, default=None,
                         help='Optional path to lf_scores_simplified_qwen.csv for covariate regression.')
     args = parser.parse_args()

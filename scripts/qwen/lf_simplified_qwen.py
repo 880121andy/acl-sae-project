@@ -103,10 +103,10 @@ def derive_peak_map(results_dir: Path, metric: str = 'cosine_dist') -> Dict[str,
 def main():
     project_root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data-dir', type=Path, default=project_root / 'dataset')
-    parser.add_argument('--results-dir', type=Path, default=project_root / 'results' / 'qwen',
+    parser.add_argument('--data-dir', type=Path, default=Path('/home/tyleryeh47/sae_slang/data'))
+    parser.add_argument('--results-dir', type=Path, default=Path('/home/tyleryeh47/sae_slang/results/qwen'),
                         help='Directory with run_qwen.py outputs.')
-    parser.add_argument('--output-dir', type=Path, default=project_root / 'results' / 'qwen' / 'lexical_familiarity')
+    parser.add_argument('--output-dir', type=Path, default=Path('/home/tyleryeh47/sae_slang/results/qwen/lexical_familiarity'))
     parser.add_argument('--model', '-m', default='Qwen/Qwen3.5-9B')
     parser.add_argument('--peak-metric', default='cosine_dist',
                         choices=['cosine_dist', 'l2_dist', 'l1_dist'])

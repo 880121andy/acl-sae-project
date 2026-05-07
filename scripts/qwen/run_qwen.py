@@ -547,20 +547,51 @@ def analyze_all_layers_sequential_token_level(
     pooling: str = "all_diff",
     checkpoint_dir: Path = Path("."),
     checkpoint_prefix: str = "checkpoint",
+    resume: bool = True,
 ) -> pd.DataFrame:
-    all_results = []
-    for layer in range(start_layer, num_layers):
+    checkpoint_path = Path(checkpoint_dir) / f"{checkpoint_prefix}_progress.csv"
+
+    all_results: List[pd.DataFrame] = []
+    actual_start = start_layer
+
+    if resume and checkpoint_path.exists():
+        try:
+            prior_df = pd.read_csv(checkpoint_path)
+        except Exception as e:
+            print(f"  [resume] Failed to read {checkpoint_path}: {e}; starting fresh.")
+            prior_df = pd.DataFrame()
+        if not prior_df.empty and 'layer' in prior_df.columns:
+            done_layers = set(prior_df['layer'].astype(int).unique())
+            next_layer = start_layer
+            while next_layer in done_layers and next_layer < num_layers:
+                next_layer += 1
+            actual_start = next_layer
+            kept = prior_df[(prior_df['layer'] >= start_layer) &
+                            (prior_df['layer'] < actual_start)]
+            if not kept.empty:
+                all_results.append(kept)
+                print(f"  [resume] Loaded layers {start_layer}-{actual_start - 1} "
+                      f"from {checkpoint_path.name} ({len(kept)} rows); "
+                      f"resuming at layer {actual_start}")
+
+    if actual_start >= num_layers:
+        print(f"  [resume] All {num_layers} layers already complete; skipping compute.")
+        return pd.concat(all_results, ignore_index=True) if all_results else pd.DataFrame()
+
+    for layer in range(actual_start, num_layers):
         layer_df = analyze_pairs_single_layer_token_level(
             pairs, layer, model, tokenizer,
             sae_release=sae_release, max_pairs=max_pairs, pooling=pooling,
         )
         all_results.append(layer_df)
 
-        if (layer + 1) % 10 == 0:
-            checkpoint_df = pd.concat(all_results, ignore_index=True)
-            checkpoint_path = Path(checkpoint_dir) / f"{checkpoint_prefix}_layer_{layer + 1}.csv"
-            checkpoint_df.to_csv(checkpoint_path, index=False)
-            print(f"  Checkpoint saved: {checkpoint_path}")
+        checkpoint_df = pd.concat(all_results, ignore_index=True)
+        tmp_path = checkpoint_path.with_name(checkpoint_path.name + '.tmp')
+        checkpoint_df.to_csv(tmp_path, index=False)
+        tmp_path.replace(checkpoint_path)
+
+        if (layer + 1) % 10 == 0 or layer == num_layers - 1:
+            print(f"  Checkpoint saved: {checkpoint_path} (through layer {layer})")
 
     return pd.concat(all_results, ignore_index=True)
 
@@ -829,9 +860,9 @@ def parse_args():
                         help='sae_lens release name (default: %(default)s). The L=50 sibling '
                              'release "qwen-scope-3.5-9b-base-w64k-l50" can be used as a '
                              'sparsity-ablation control.')
-    parser.add_argument('--data-dir', type=Path, default=project_root / 'dataset',
+    parser.add_argument('--data-dir', type=Path, default=Path('/home/tyleryeh47/sae_slang/data'),
                         help='Directory containing the *_baseline.csv / *_tagged.csv files.')
-    parser.add_argument('--output-dir', type=Path, default=project_root / 'results' / 'qwen',
+    parser.add_argument('--output-dir', type=Path, default=Path('/home/tyleryeh47/sae_slang/results/qwen'),
                         help='Where to write CSVs / plots / analysis JSON.')
     parser.add_argument('--model-id', default='Qwen/Qwen3.5-9B',
                         help='Hugging Face model id of the Qwen base model.')
@@ -845,6 +876,9 @@ def parse_args():
     parser.add_argument('--start-layer', type=int, default=0)
     parser.add_argument('--end-layer', type=int, default=None,
                         help='Exclusive upper bound on layers; defaults to num_hidden_layers.')
+    parser.add_argument('--resume', action=argparse.BooleanOptionalAction, default=True,
+                        help='Resume from {prefix}_progress.csv if present (default: enabled). '
+                             'Use --no-resume to force a fresh run.')
     return parser.parse_args()
 
 
@@ -896,6 +930,7 @@ def main():
             pooling=args.pooling,
             checkpoint_dir=args.output_dir,
             checkpoint_prefix=f"checkpoint_{ds_name}_qwen",
+            resume=args.resume,
         )
 
         results_csv = args.output_dir / f"{ds_name}_qwen_{timestamp}.csv"
